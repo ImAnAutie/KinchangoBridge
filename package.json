@@ -9,7 +9,12 @@
   "author": "Gregory Oakley-Stevenson <gregory@okonetwork.org.uk>",
   "license": "ISC",
   "dependencies": {
+    "cookie": "^0.3.1",
     "express": "^4.16.4",
-    "request": "github:request/request"
+    "fs-extra": "^7.0.1",
+    "jquery": "^3.3.1",
+    "jsdom": "^13.0.0",
+    "request": "github:request/request",
+    "tough-cookie-filestore": "0.0.1"
   }
 }
