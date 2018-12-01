@@ -18,12 +18,14 @@ companies={
 		"protocol": "https",
 		"domain": "kinchbus.co.uk",
 		"smartcardurl": "/kinchkard",
+		"cardname": "kinchkard"
 	},
 	"trentbarton": {
 		"name": "trentbarton",
 		"protocol": "https",
 		"domain": "trentbarton.co.uk",
-		"smartcardurl": "/mango"
+		"smartcardurl": "/mango",
+		"cardname": "mango"
 	}
 };
 
@@ -40,13 +42,13 @@ app.get('/', function (req, res) {
 });
 
 app.post('/:company_tag/signin', function (req, res) {
-	company=get_company(req.params.company_tag);
+	var company=get_company(req.params.company_tag);
 	if (!company) {
 		res.send("Not a valid company");
 	};
 
-	username=req.body.username;
-	password=req.body.password;
+	var username=req.body.username;
+	var password=req.body.password;
 
 	request(company.protocol+"://"+company.domain+company.smartcardurl, function (error, response, body) {
 		console.log(`Getting ${company.name} smartcardurl viewstate`);
@@ -60,20 +62,28 @@ app.post('/:company_tag/signin', function (req, res) {
 
 			var myJSDom = new JSDOM (body);
 			var $ = require('jquery')(myJSDom.window);
-			formdata={};
+			var formdata={};
 
 			formdata['__EVENTTARGET']="";
 			formdata['__EVENTARGUMENT']="";
 			formdata['__VIEWSTATE']=$('#__VIEWSTATE').val();
-			formdata['ctl00$ctl00$Main$ctl00$ctl01$txtUsername']=username;
-			formdata['ctl00$ctl00$Main$ctl00$ctl01$txtPassword']=password;
-			formdata['ctl00$ctl00$Main$ctl00$ctl01$btnLogin']=$('#Main_ctl00_ctl01_btnLogin').val();
 			formdata['__VIEWSTATEGENERATOR']=$('#__VIEWSTATEGENERATOR').val();
 			formdata['__EVENTVALIDATION']=$('#__EVENTVALIDATION').val();
 
-			cookiejarindex=cookiejars.push( request.jar() ) - 1;
-		
-			request.post({url:company.protocol+"://"+company.domain+company.smartcardurl, followRedirect: false, form: formdata,jar: cookiejars[cookiejarindex]}, function(error,response,body){
+			//for trentbarton
+			formdata['ctl00$ctl00$Main$ctl00$ctl00$txtUsername']=username;
+			formdata['ctl00$ctl00$Main$ctl00$ctl00$txtPassword']=password;
+			formdata['ctl00$ctl00$Main$ctl00$ctl00$btnLogin']=$('#Main_ctl00_ctl00_btnLogin').val();
+
+			//for kinchbus
+			formdata['ctl00$ctl00$Main$ctl00$ctl01$txtUsername']=username;
+			formdata['ctl00$ctl00$Main$ctl00$ctl01$txtPassword']=password;
+			formdata['ctl00$ctl00$Main$ctl00$ctl01$btnLogin']=$('#Main_ctl00_ctl01_btnLogin').val();
+
+			
+			var jar=request.jar();
+			var url=company.protocol+"://"+company.domain+company.smartcardurl;
+			request.post({url:url, followRedirect: false, form: formdata,jar: jar}, function(error,response,body){
 				console.log(`Posting to ${company.name} smartcard url`);
 				if (error) {
 					console.log('error:', error);
@@ -81,16 +91,17 @@ app.post('/:company_tag/signin', function (req, res) {
 				} else {
 					console.log('statusCode:', response && response.statusCode);
 
-					cookies=cookieparse.parse(cookiejars[cookiejarindex].getCookieString(company.protocol+"://"+company.domain+company.smartcardurl));
-					cookiejars[cookiejarindex]=null;
+					var cookies=cookieparse.parse(jar.getCookieString(company.protocol+"://"+company.domain+company.smartcardurl));
+					jar=null;
 
-					result={};
+					var result={};
 					if (cookies['MangoUser_ID']) {
 							console.log("Signed in");
 							result.status=true;
 							result.authenticationtoken=cookies;
 					} else {
 							console.log("Sign in failure.");
+							result.formdata=formdata;
 							result.status=false;
 							result.status_human=`Failed to sign in. Either incorrect username/password or ${company.name} server error.`;
 					};
@@ -104,23 +115,21 @@ app.post('/:company_tag/signin', function (req, res) {
 });
 
 
-
-
 app.get('/:company_tag/profile', function (req, res) {
-	company=get_company(req.params.company_tag);
+	var company=get_company(req.params.company_tag);
 	if (!company) {
 		res.send("Not a valid company");
 	};
 
 	var url = company.protocol+"://"+company.domain+company.smartcardurl+"/profile";
-	var cookiejarindex=cookiejars.push( request.jar() ) - 1;
+	var jar=request.jar();
 	try {
-		authenticationtoken=JSON.parse(req.query.authenticationtoken);
-		cookiejars[cookiejarindex].setCookie(request.cookie('MangoUser_ID='+authenticationtoken['MangoUser_ID']), url);
-		cookiejars[cookiejarindex].setCookie(request.cookie('MangoUser_Token='+authenticationtoken['MangoUser_Token']), url);
+		var authenticationtoken=JSON.parse(req.query.authenticationtoken);
+		jar.setCookie(request.cookie('MangoUser_ID='+authenticationtoken['MangoUser_ID']), url);
+		jar.setCookie(request.cookie('MangoUser_Token='+authenticationtoken['MangoUser_Token']), url);
 	} catch (error) {
 		console.log(error);
-		result={};
+		var result={};
 		result.status=false;
 		result.status_human=`Invalid authentication token`;
 		res.json(result);
@@ -128,7 +137,7 @@ app.get('/:company_tag/profile', function (req, res) {
 	};
 
 	console.log(url);
-	request.get({url:url, followRedirect: false, jar: cookiejars[cookiejarindex]}, function(error,response,body){
+	request.get({url:url, followRedirect: false, jar: jar}, function(error,response,body){
 		console.log(`getting ${company.name} smartcard profile`);
 		if (error) {
 			console.log('error:', error);
@@ -137,7 +146,7 @@ app.get('/:company_tag/profile', function (req, res) {
 			console.log('statusCode:', response && response.statusCode);
 
 			if (response.statusCode!=200) {
-				result={};
+				var result={};
 				result.status=false;
 				result.status_human=`Unknown status from ${company.name}`;
 				res.json(result);
@@ -146,7 +155,7 @@ app.get('/:company_tag/profile', function (req, res) {
 			var myJSDom = new JSDOM (body);
 			var $ = require('jquery')(myJSDom.window);
 
-			result={};
+			var result={};
 			result.status=true;
 			result.profile={};
 
@@ -171,12 +180,82 @@ app.get('/:company_tag/profile', function (req, res) {
 			result.profile.misc.twitter=$('#Main_ctl01_ctrlProfile_txtTwitterUsername').val();
 			result.profile.misc.keepinformed=$('#Main_ctl01_ctrlProfile_chkKeepInformed').is(':checked');
 
-			result.profile.news={};
+			result.profile.news=[];
 			$('.serviceChkBoxList').find('.chkBoxItem').each(function( index ) {
 				service={};
 				service.name=$(this).find('span').text();
 				service.checked=$(this).find('[type="checkbox"]').is(':checked');
-				result.profile.news[service.name.replace(/\s/g, '')]=service;
+				result.profile.news.push(service);
+			});
+
+			res.json(result);
+		};
+	});
+});
+
+app.get('/:company_tag/cards', function (req, res) {
+	var company=get_company(req.params.company_tag);
+	if (!company) {
+		res.send("Not a valid company");
+	};
+
+	var url = company.protocol+"://"+company.domain+company.smartcardurl+"/my-"+company.cardname;
+	var jar=request.jar();
+	try {
+		var authenticationtoken=JSON.parse(req.query.authenticationtoken);
+		jar.setCookie(request.cookie('MangoUser_ID='+authenticationtoken['MangoUser_ID']), url);
+		jar.setCookie(request.cookie('MangoUser_Token='+authenticationtoken['MangoUser_Token']), url);
+	} catch (error) {
+		console.log(error);
+		var result={};
+		result.status=false;
+		result.status_human=`Invalid authentication token`;
+		res.json(result);
+		return;
+	};
+
+	console.log(url);
+	request.get({url:url, followRedirect: false, jar: jar}, function(error,response,body){
+		console.log(`getting ${company.name} card list`);
+		if (error) {
+			console.log('error:', error);
+			console.log('statusCode:', response && response.statusCode);
+		} else {
+			console.log('statusCode:', response && response.statusCode);
+
+			if (response.statusCode!=200) {
+				var result={};
+				result.status=false;
+				result.status_human=`Unknown status from ${company.name}`;
+				res.json(result);
+				return;
+			};
+
+			var myJSDom = new JSDOM (body);
+			var $ = require('jquery')(myJSDom.window);
+
+			var result={};
+			result.status=true;
+			result.cards=[];
+
+			$('.mango-card').each(function() {
+                                var card={};
+                                card.number=$(this).find('dd').eq(0).text().trim();
+
+                                card.holder=$(this).find('dd').eq(1)
+				if (card.holder) {
+					card.holder=card.holder.text().trim().replace(/(\r\n\t|\n|\r\t)/gm,"").replace(/ +(?= )/g,'');
+				} else {
+					card.holder="";
+				};
+
+                                card.name=$(this).find('dd').eq(2);
+				if (card.name) {
+					card.name=card.name.text().trim().replace(/(\r\n\t|\n|\r\t)/gm,"").replace(/ +(?= )/g,'');
+				} else {
+					card.name="";
+				};
+                                result.cards.push(card);
 			});
 
 			res.json(result);
