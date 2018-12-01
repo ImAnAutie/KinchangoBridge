@@ -1,5 +1,5 @@
 {
-  "name": "kinchango",
+  "name": "KinchangoBridge",
   "version": "1.0.0",
   "description": "trentbarton/Kinchbus smart card ticketing unoffical API bridge",
   "main": "index.js",
