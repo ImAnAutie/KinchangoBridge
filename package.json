@@ -9,10 +9,9 @@
   "author": "Gregory Oakley-Stevenson <gregory@okonetwork.org.uk>",
   "license": "ISC",
   "dependencies": {
+    "cheerio": "^1.0.0-rc.2",
     "cookie": "^0.3.1",
     "express": "^4.16.4",
-    "jquery": "^3.3.1",
-    "jsdom": "^13.0.0",
     "request": "github:request/request"
   }
 }

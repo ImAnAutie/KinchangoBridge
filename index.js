@@ -8,9 +8,8 @@ app.use(bodyParser.urlencoded({
 }));
 const port = 3111;
 const request = require('request');
-const { JSDOM } = require( 'jsdom' );
-var cookiejars=[];
 var cookieparse = require('cookie');
+const cheerio = require('cheerio');
 
 companies={
 	"kinchbus": {
@@ -50,8 +49,9 @@ app.post('/:company_tag/signin', function (req, res) {
 	var username=req.body.username;
 	var password=req.body.password;
 
+	console.log(`Getting ${company.name} smartcardurl viewstate`);
 	request(company.protocol+"://"+company.domain+company.smartcardurl, function (error, response, body) {
-		console.log(`Getting ${company.name} smartcardurl viewstate`);
+		console.log(`Got ${company.name} smartcardurl viewstate`);
 		if (error) {
 			console.log('error:', error);
 			console.log('statusCode:', response && response.statusCode);
@@ -60,8 +60,10 @@ app.post('/:company_tag/signin', function (req, res) {
 			//console.log('body:', body);
 
 
-			var myJSDom = new JSDOM (body);
-			var $ = require('jquery')(myJSDom.window);
+			console.log(`Loading Cheerio`);
+			var $ = cheerio.load(body);
+			console.log(`Loaded Cheerio`);
+
 			var formdata={};
 
 			formdata['__EVENTTARGET']="";
@@ -83,8 +85,9 @@ app.post('/:company_tag/signin', function (req, res) {
 			
 			var jar=request.jar();
 			var url=company.protocol+"://"+company.domain+company.smartcardurl;
+			console.log(`Posting to ${company.name} smartcard url`);
 			request.post({url:url, followRedirect: false, form: formdata,jar: jar}, function(error,response,body){
-				console.log(`Posting to ${company.name} smartcard url`);
+				console.log(`Posted to ${company.name} smartcard url`);
 				if (error) {
 					console.log('error:', error);
 					console.log('statusCode:', response && response.statusCode);
@@ -152,8 +155,8 @@ app.get('/:company_tag/profile', function (req, res) {
 				res.json(result);
 				return;
 			};
-			var myJSDom = new JSDOM (body);
-			var $ = require('jquery')(myJSDom.window);
+
+			var $ = cheerio.load(body);
 
 			var result={};
 			result.status=true;
@@ -231,8 +234,7 @@ app.get('/:company_tag/cards', function (req, res) {
 				return;
 			};
 
-			var myJSDom = new JSDOM (body);
-			var $ = require('jquery')(myJSDom.window);
+			var $ = cheerio.load(body);
 
 			var result={};
 			result.status=true;
@@ -323,8 +325,7 @@ app.get('/:company_tag/cards/:card_number', function (req, res) {
 				return;
 			};
 
-			var myJSDom = new JSDOM (body);
-			var $ = require('jquery')(myJSDom.window);
+			var $ = cheerio.load(body);
 
 			var result={};
 			result.status=true;
