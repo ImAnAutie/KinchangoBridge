@@ -1,3 +1,5 @@
+
+
 # Kinchango
 Kinchbus/trentbarton smart card website api bridge
 
@@ -5,8 +7,9 @@ This bridge enables mobile apps to be written that interact with the Kinchbus Ki
 
 Currently working features are
 * Sign in
-* Profile fetching
-* Card list fetching
+* Profile information fetching
+* List of cards
+* List of journeys on a card
 
 It appears that you cannot have multiple sessions for a single MangoUser_ID open at any one time,signing in somewhere else
 when you have an open session invalidates any old MangoUser_Token's
