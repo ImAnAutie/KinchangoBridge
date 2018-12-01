@@ -242,7 +242,7 @@ app.get('/:company_tag/cards', function (req, res) {
                                 var card={};
                                 card.number=$(this).find('dd').eq(0).text().trim();
 
-                                card.holder=$(this).find('dd').eq(1)
+                                card.holder=$(this).find('dd').eq(1);
 				if (card.holder) {
 					card.holder=card.holder.text().trim().replace(/(\r\n\t|\n|\r\t)/gm,"").replace(/ +(?= )/g,'');
 				} else {
@@ -255,9 +255,107 @@ app.get('/:company_tag/cards', function (req, res) {
 				} else {
 					card.name="";
 				};
+
+				card.products=[];
+				$(this).find('.productList').find('dl').each(function() {
+					product={};
+					product.name=$(this).find('dd').eq(0).html();
+					product.start=$(this).find('dd').eq(1).html();
+					product.expiry=$(this).find('dd').eq(2).html();
+					card.products.push(product);
+				});
+
                                 result.cards.push(card);
 			});
 
+			res.json(result);
+		};
+	});
+});
+
+
+
+app.get('/:company_tag/cards/:card_number', function (req, res) {
+	var company=get_company(req.params.company_tag);
+	if (!company) {
+		res.send("Not a valid company");
+	};
+
+	var card_number=req.params.card_number;
+
+	//the websites display a card suffix (eg shows 0234567890-1 with suffix being -1)
+	//but card specific pages do NOT accept suffix so we need to remove it, if it is given
+
+	if (card_number.slice(-2,-1)=="-") {
+		card_number=card_number.slice(0,-2);
+	};
+
+	var url = company.protocol+"://"+company.domain+company.smartcardurl+"/my-"+company.cardname+"/journey-history?card="+card_number;
+
+	var jar=request.jar();
+	try {
+		var authenticationtoken=JSON.parse(req.query.authenticationtoken);
+		jar.setCookie(request.cookie('MangoUser_ID='+authenticationtoken['MangoUser_ID']), url);
+		jar.setCookie(request.cookie('MangoUser_Token='+authenticationtoken['MangoUser_Token']), url);
+	} catch (error) {
+		console.log(error);
+		var result={};
+		result.status=false;
+		result.status_human=`Invalid authentication token`;
+		res.json(result);
+		return;
+	};
+
+	console.log(url);
+	request.get({url:url, followRedirect: false, jar: jar}, function(error,response,body){
+		console.log(`getting ${company.name} card info for card ${card_number}`);
+		if (error) {
+			console.log('error:', error);
+			console.log('statusCode:', response && response.statusCode);
+		} else {
+			console.log('statusCode:', response && response.statusCode);
+
+			if (response.statusCode!=200) {
+				var result={};
+				result.status=false;
+				result.status_human=`Unknown status from ${company.name}`;
+				res.json(result);
+				return;
+			};
+
+			var myJSDom = new JSDOM (body);
+			var $ = require('jquery')(myJSDom.window);
+
+			var result={};
+			result.status=true;
+
+			result.card={};
+			result.card.number=$('.mango-card').find('dd').eq(0).text().trim();
+
+                        result.card.holder=$('.mango-card').find('dd').eq(1);
+			if (result.card.holder) {
+				result.card.holder=result.card.holder.text().trim().replace(/(\r\n\t|\n|\r\t)/gm,"").replace(/ +(?= )/g,'');
+			} else {
+				result.card.holder="";
+			};
+
+                        result.card.name=$('.mango-card').find('dd').eq(2);
+			if (result.card.name) {
+				result.card.name=result.card.name.text().trim().replace(/(\r\n\t|\n|\r\t)/gm,"").replace(/ +(?= )/g,'');
+			} else {
+				result.card.name="";
+			};
+
+			result.card.journeys=[];
+			$('.journey-history').find('tbody').find('tr').not('.head').each(function() {
+				var journey={};
+				//this will need to be updated to show Mango tap off/destinations
+
+				journey.start_time=$(this).find('td').eq(0).text().trim().replace(/(\r\n\t|\n|\r\t)/gm,"").replace(/ +(?= )/g,'');
+				journey.start_location=$(this).find('td').eq(1).text().trim().replace(/(\r\n\t|\n|\r\t)/gm,"").replace(/ +(?= )/g,'');
+				journey.product=$(this).find('td').eq(2).text().trim().replace(/(\r\n\t|\n|\r\t)/gm,"").replace(/ +(?= )/g,'');
+				result.card.journeys.push(journey);	
+			});
 			res.json(result);
 		};
 	});
